@@ -26,6 +26,9 @@ $(call inherit-product, vendor/twrp/config/common.mk)
 # Inherit device configuration
 $(call inherit-product, device/xiaomi/nabu/device.mk)
 
+# Inherit any OrangeFox-specific settings
+$(call inherit-product-if-exists, $(DEVICE_PATH)/fox_nabu.mk)
+
 ## Device identifier. This must come after all inclusions
 PRODUCT_DEVICE := nabu
 PRODUCT_NAME := twrp_nabu
