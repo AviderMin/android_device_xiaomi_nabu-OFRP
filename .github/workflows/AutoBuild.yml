@@ -1,4 +1,4 @@
-name: 🦊 OrangeFox for nabu - 月度自动构建
+name: 🦊 OrangeFox Recovery - 月度自动构建
 
 # Credits to:
 # https://github.com/TeamWin
@@ -13,7 +13,7 @@ on:
 
 jobs:
   build:
-    name: 🏗️ 构建 OrangeFox for nabu
+    name: 🏗️ 构建 OrangeFox Recovery
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -38,7 +38,6 @@ jobs:
 
       - name: 🧰 安装构建依赖环境
         run: |
-          sudo apt update
           sudo apt install -y aria2 linux-modules-extra-$(uname -r) zram-tools
           git clone https://gitlab.com/OrangeFox/misc/scripts.git -b master
           cd scripts
@@ -57,7 +56,7 @@ jobs:
       - name: 📥 拉取仓库内容
         uses: actions/checkout@main
 
-      - name: ⚙️ Setup ccache
+      - name: ⚙️ 配置 ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
           max-size: "2G"
@@ -101,18 +100,16 @@ jobs:
       - name: 🔨 编译 OrangeFox Recovery
         run: |
           cd ${GITHUB_WORKSPACE}/OrangeFox/fox_${MANIFEST_BRANCH}
-
+          set +e
           export FOX_BUILD_DEVICE=${DEVICE_NAME}
           export ALLOW_MISSING_DEPENDENCIES=true
-
           if [[ "${USE_CCACHE}" == "true" ]]; then
             export USE_CCACHE=1
             export CCACHE_EXEC=/usr/bin/ccache
-            sed -i 's/return sandboxConfig\.working/return false/g' \
-              build/soong/ui/build/sandbox_linux.go
+            sed -i 's/return sandboxConfig\.working/return false/g' build/soong/ui/build/sandbox_linux.go
           fi
-
           source build/envsetup.sh
+          set -e
 
           if [[ "${MANIFEST_BRANCH}" == "14.1" ]]; then
             lunch twrp_${DEVICE_NAME}-ap2a-eng
@@ -133,25 +130,24 @@ jobs:
 
       - name: 📦 规范化输出文件名
         run: |
-          BASE_OUT=${GITHUB_WORKSPACE}/OrangeFox/fox_${MANIFEST_BRANCH}/out/target/product/${DEVICE_NAME}
+          echo "Searching OrangeFox artifacts..."
 
-          echo "Searching OrangeFox output directory under: $BASE_OUT"
+          mapfile -t FILES < <(
+            find "${GITHUB_WORKSPACE}/OrangeFox" \
+              -type f \( -name 'OrangeFox*.img' -o -name 'OrangeFox*.zip' \)
+          )
 
-          OUT_DIR=$(find "$BASE_OUT" -maxdepth 2 -type d -name "$DEVICE_NAME" | head -n 1)
-
-          if [[ -z "$OUT_DIR" ]]; then
-            echo "ERROR: Cannot find output directory for device ${DEVICE_NAME}"
+          if [[ ${#FILES[@]} -eq 0 ]]; then
+            echo "ERROR: No OrangeFox artifacts found"
             exit 1
           fi
 
-          echo "Using OUT_DIR=$OUT_DIR"
-
-          for f in "$OUT_DIR"/OrangeFox*.img "$OUT_DIR"/OrangeFox*.zip; do
-            [ -e "$f" ] || continue
+          for f in "${FILES[@]}"; do
+            dir=$(dirname "$f")
             base=$(basename "$f")
             ext="${base##*.}"
             name="${base%.*}"
-            mv "$f" "$OUT_DIR/${name}-${BUILD_DATE}.${ext}"
+            mv "$f" "$dir/${name}-${BUILD_DATE}.${ext}"
           done
 
       - name: 🚀 发布至 GitHub Releases
